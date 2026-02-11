@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Report {
+  /// YYYY-MM-DD
+  date       String   @id @db.VarChar(10)
+  json       Json?
+
+  publicHtml String?  @map("public_html")
+  fullHtml   String?  @map("full_html")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("reports")
+}
