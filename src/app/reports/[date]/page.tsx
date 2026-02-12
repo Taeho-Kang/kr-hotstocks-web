@@ -19,10 +19,24 @@ export default async function ReportDetailPage({
 
   const report = await prisma.report.findUnique({
     where: { date },
-    select: { date: true, publicHtml: true, fullHtml: true },
+    select: { date: true, publicHtml: true, fullHtml: true, json: true },
   });
 
+  const userId = (session?.user as unknown as { id?: string } | undefined)?.id;
+
+  const settings = isLoggedIn
+    ? await prisma.userSettings.findUnique({
+        where: { userId },
+      })
+    : null;
+
   const html = isLoggedIn ? report?.fullHtml : report?.publicHtml;
+
+  // NOTE: Personalization is applied at render-time.
+  // Today we only gate sections in the UI. Full filtering will be applied once
+  // reports are stored as structured JSON + rendered from JSON.
+  const showRise = settings?.showRise ?? true;
+  const showFall = settings?.showFall ?? true;
 
   return (
     <div className="min-h-screen bg-zinc-50 px-6 py-10 font-sans text-zinc-950 dark:bg-black dark:text-zinc-50 sm:px-10">
@@ -51,15 +65,30 @@ export default async function ReportDetailPage({
           <div className="rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
             해당 날짜의 리포트가 없습니다.
           </div>
+        ) : isLoggedIn && !showRise && !showFall ? (
+          <div className="rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+            설정에서 상승/하락 섹션이 모두 꺼져 있어요. /settings에서 켜주세요.
+          </div>
         ) : !html ? (
           <div className="rounded-xl border border-zinc-200 bg-white p-5 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
             리포트는 있으나 렌더링 HTML이 비어있습니다.
           </div>
         ) : (
-          <article
-            className="rounded-xl border border-zinc-200 bg-white p-5 prose prose-zinc max-w-none dark:border-zinc-800 dark:bg-zinc-950 dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
+          <>
+            {isLoggedIn && settings && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+                적용 중인 필터: 최소 시총 {settings.minMarketCapEok.toLocaleString("ko-KR")}억 · ETF/ETN
+                {settings.excludeEtfEtn ? " 제외" : " 포함"} · 우선주
+                {settings.excludePreferred ? " 제외" : " 포함"} · 상승 {showRise ? "ON" : "OFF"} · 하락
+                {showFall ? "ON" : "OFF"}
+              </div>
+            )}
+
+            <article
+              className="rounded-xl border border-zinc-200 bg-white p-5 prose prose-zinc max-w-none dark:border-zinc-800 dark:bg-zinc-950 dark:prose-invert"
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          </>
         )}
 
         {!isLoggedIn && report?.fullHtml && (

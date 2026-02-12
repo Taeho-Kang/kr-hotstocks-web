@@ -3,19 +3,94 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
+/// Stored daily report (canonical)
 model Report {
   /// YYYY-MM-DD
-  date       String   @id @db.VarChar(10)
-  json       Json?
+  date      String   @id @db.VarChar(10)
+  json      Json?
 
   publicHtml String?  @map("public_html")
   fullHtml   String?  @map("full_html")
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("reports")
+}
+
+/// NextAuth.js models (Prisma Adapter)
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts      Account[]
+  sessions      Session[]
+
+  settings      UserSettings?
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  @@map("users")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String  @map("user_id")
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+/// Personalization (logged-in)
+model UserSettings {
+  userId            String  @id @map("user_id")
+  minMarketCapEok   Int     @default(3000) @map("min_market_cap_eok")
+  excludeEtfEtn     Boolean @default(true) @map("exclude_etf_etn")
+  excludePreferred  Boolean @default(true) @map("exclude_preferred")
+  showRise          Boolean @default(true) @map("show_rise")
+  showFall          Boolean @default(true) @map("show_fall")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
 }
